@@ -57,15 +57,15 @@ for img_url in image_urls:
 
                 # potential_plate = cv2.resize(potential_plate, (int(w * scale), int(h * scale)))
             
-                sub_results = sam_model(potential_plate)
-                sub_boxes = sub_results[0].boxes
-                no_sub_seg = len(sub_boxes.xywh)
-                print("Seg ", i, " - no. sub segs: ", no_sub_seg)
-                for j in range(no_sub_seg):
-                    sf_x, sf_y, sf_w, sf_h = sub_boxes.xywh[j]
-                    center_x, center_y = int(sf_x), int(sf_y)
-                    print("     Sub seg ", j, " - center_x: ", center_x, ", center_y: ", center_y)
-                    potential_plate = cv2.putText(potential_plate, str(j), (center_x, center_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
+                # sub_results = sam_model(potential_plate)
+                # sub_boxes = sub_results[0].boxes
+                # no_sub_seg = len(sub_boxes.xywh)
+                # print("Seg ", i, " - no. sub segs: ", no_sub_seg)
+                # for j in range(no_sub_seg):
+                #     sf_x, sf_y, sf_w, sf_h = sub_boxes.xywh[j]
+                #     center_x, center_y = int(sf_x), int(sf_y)
+                #     print("     Sub seg ", j, " - center_x: ", center_x, ", center_y: ", center_y)
+                #     potential_plate = cv2.putText(potential_plate, str(j), (center_x, center_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2, cv2.LINE_AA)
                 cv2.imshow('potential_plate', potential_plate)
                 cv2.waitKey(0)
                 cv2.destroyAllWindows()
