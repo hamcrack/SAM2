@@ -1,4 +1,5 @@
 # assumptions:
+# 0. The "Environment Set-up" section has been completed using this guide - https://github.com/facebookresearch/sam2/blob/main/notebooks/automatic_mask_generator_example.ipynb
 # 1. the image has been taken so that the car is the right way up in the image
 # 2. the car is not so far away that the umberplate cant be read
 # 3. the car is not so close that the numberplate coveres the whole image
@@ -11,6 +12,7 @@ from sam2.build_sam import build_sam2
 from sam2.sam2_image_predictor import SAM2ImagePredictor
 from sam2.automatic_mask_generator import SAM2AutomaticMaskGenerator
 import cv2
+import os
 import urllib
 import numpy as np
 import copy
@@ -58,7 +60,7 @@ urls_string = "https://images.coches.com/_vn_/kia/Sportage/c399cf1d98a95d24f8e87
 
 image_urls = urls_string.split()
 
-debug = True
+debug = False
 show_images = False
 save_images = True
 show_overlays = True
@@ -83,8 +85,8 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
     for img_url in image_urls:
         image_no += 1
         EU = False
-        filename = f"image_{image_no:02d}"
-        print("Processing image ", filename)
+        filename = "image" + str(image_no)
+        print("Processing", filename)
         image = img_from_url(img_url)
         display = copy.deepcopy(image)
         masks = mask_generator.generate(image)
@@ -118,7 +120,7 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
                     if debug:
                         print("    potential plate min pixel value: ", min_pixel_value, " max pixel value: ", max_pixel_value, " pixel range: ", pixel_range)
 
-                    if pixel_range < 150:
+                    if pixel_range < 175:
                         if debug:
                             print("    potential plate pixel range too small, skipping..........")
                         continue
@@ -130,7 +132,7 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
                     y_bound = int(s_h / 6)
                     if debug:
                         print("    ", no_sub_masks, " sub masks - bounds: ", x_bound, y_bound, " seg area: ", seg_area)
-                    if show_overlays:
+                    if show_overlays and debug:
                         display_plate = cv2.rectangle(display_plate, (x_bound, y_bound), (len(potential_plate[0])-x_bound, len(potential_plate)-y_bound), (255, 0, 0), 2)
                     no_valid_sub_masks = 0
                     centers_x = np.array([])
@@ -147,15 +149,16 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
 
                         avg_color = potential_plate[sub_center_y][sub_center_x]
                         hsv_img = cv2.cvtColor(np.array([[avg_color, avg_color], [avg_color, avg_color]], dtype=np.uint8), cv2.COLOR_RGB2HSV)
-                        # TODO something is wrong with the color conversion
+                        
                         if debug:
                             print("         ave color: ", avg_color, ", hsv:", hsv_img[0][0])
                             # if 115 < int(hsv_img[0][0][0]) < 130 and 126 < int(hsv_img[0][0][1]) and int(hsv_img[0][0][2]) > 50:
                             #     print("         its blue")
                             #     blue = True
-                            if avg_color[0] > 110 and avg_color[1] < 150 and avg_color[2] < 60:
+                        if avg_color[0] > 110 and avg_color[1] < 150 and avg_color[2] < 60:
+                            if debug:
                                 print("         its blue 2")
-                                blue = True
+                            blue = True
                         
 
 
@@ -167,7 +170,7 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
                             centers_x = np.append(centers_x, sub_center_x)
                             centers_y = np.append(centers_y, sub_center_y)
                             sub_color = (0, 255, 0)
-                        if show_overlays:
+                        if show_overlays and debug:
                             display_plate = cv2.circle(display_plate, (sub_center_x, sub_center_y), 3, sub_color, 2) 
                             display_plate = cv2.rectangle(display_plate, (int(sf_x), int(sf_y)), (int(sf_x + sf_w), int(sf_y + sf_h)), (255, 0, 0), 2)
                     if no_valid_sub_masks > 3:
@@ -181,24 +184,29 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
                         center_dist = abs(a * sub_center_x + b * sub_center_y + c) / np.sqrt(a**2 + b**2)
                         if debug:
                             print(f"    plate slope: {slope}, intercept: {intercept}, r_value: {r_value}, p_value: {p_value}, std_err: {std_err}, center_dist: {center_dist}")
-                            if std_err < max_std_err and center_dist < max_center_dist:
+                        if std_err < max_std_err and center_dist < max_center_dist:
+                            if debug:
                                 print("    Found ", no_valid_sub_masks, " valid sub masks")
-                                color = (0, 255, 0)
+                            color = (0, 255, 0)
 
-                    if save_images:
+                    if save_images and debug:
                         cv2.imwrite(sub_filename, display_plate)
-                    if show_images:
+                    if show_images and debug:
                         cv2.imshow('display_plate', display_plate)
                         cv2.waitKey(0)
                         cv2.destroyAllWindows()
             if show_overlays:
-                display = cv2.rectangle(display, (x, y), (x + w, y + h), color, 2)
-                display = cv2.putText(display, str(i), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
+                if color[1] == 255:
+                    display = cv2.rectangle(display, (x, y), (x + w, y + h), color, 2)
+                if debug:
+                    display = cv2.putText(display, str(i), (x, y), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2, cv2.LINE_AA)
+                    display = cv2.rectangle(display, (x, y), (x + w, y + h), color, 2)
+                
 
         if EU:
             estimated_EU_cars.append(True)
             if show_overlays:
-                display = cv2.putText(display, "EU", (20, 20), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
+                display = cv2.putText(display, "EU", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2, cv2.LINE_AA)
         else:
             estimated_EU_cars.append(False)
 
@@ -210,4 +218,4 @@ with torch.inference_mode(), torch.autocast("cuda", dtype=torch.bfloat16):
             cv2.waitKey(0)
             cv2.destroyAllWindows()
     
-    print("Estimated EU cars: ", estimated_EU_cars)
+print("Estimated EU cars: ", estimated_EU_cars)
