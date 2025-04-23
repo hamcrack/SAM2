@@ -1,5 +1,5 @@
 import cv2
-import urllib
+import urllib.request
 import numpy as np
 
 def img_from_url(url):
